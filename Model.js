@@ -49,8 +49,8 @@ function Model(name) {
 
     this.DrawWireframe = function() {
 
-        for (let p=0; p<this.count; p+=3)
-            gl.drawElements(gl.LINE_LOOP, 3, gl.UNSIGNED_SHORT, p);
+        for (let p=0; p<this.count; p+=3)                    // offset in bytes (UNSIGNED_SHORT is two bytes)
+            gl.drawElements(gl.LINE_LOOP, 3, gl.UNSIGNED_SHORT, p*2);
     }
 }
 
