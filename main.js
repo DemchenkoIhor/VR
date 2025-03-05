@@ -46,6 +46,7 @@ function draw() {
 
     let matrOrth = m4.orthographic(0,1,0,1, 8,20);
     
+    // TODO: Place your code here to draw webCam surface
 
     
     /* Get the view matrix from the SimpleRotator object.*/
