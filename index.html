@@ -1,149 +1,394 @@
-<!DOCTYPE html>
-<html lang="en">
-
+<!DOCTYPE HTML>
+<html>
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Astroidal Torus</title>
+  <meta charset="UTF-8">
+  <title>AR Astroidal Torus</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
     
-    <link rel="stylesheet" href="./styles.css">
+    .info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(30, 60, 114, 0.8));
+      color: white;
+      padding: 15px 20px;
+      border-radius: 15px;
+      z-index: 999;
+      font-size: 16px;
+      font-weight: 500;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+    
+    .info-panel.marker-found {
+      background: linear-gradient(135deg, rgba(0, 128, 0, 0.8), rgba(34, 139, 34, 0.8));
+      transform: scale(1.05);
+    }
+    
+    .info-panel.marker-lost {
+      background: linear-gradient(135deg, rgba(220, 20, 60, 0.8), rgba(178, 34, 34, 0.8));
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
+    .title {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+      color: white;
+      padding: 12px 18px;
+      border-radius: 12px;
+      z-index: 999;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, rgba(0, 0, 0, 0.7), rgba(30, 60, 114, 0.7));
+      color: white;
+      padding: 12px 20px;
+      border-radius: 25px;
+      z-index: 999;
+      font-size: 14px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 80%;
+    }
+    
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 18px;
+      font-weight: 500;
+      text-align: center;
+      z-index: 998;
+    }
+    
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Mobile adjustments */
+    @media only screen and (max-width: 600px) {
+      .info-panel {
+        font-size: 14px;
+        padding: 12px 16px;
+        top: 15px;
+        left: 15px;
+      }
+      
+      .title {
+        font-size: 12px;
+        padding: 10px 14px;
+        top: 15px;
+        right: 15px;
+      }
+      
+      .instructions {
+        font-size: 12px;
+        padding: 10px 16px;
+        bottom: 15px;
+        max-width: 90%;
+      }
+      
+      .loading {
+        font-size: 16px;
+      }
+    }
+    
+    @media only screen and (max-width: 480px) {
+      .info-panel {
+        font-size: 12px;
+        padding: 10px 14px;
+      }
+      
+      .title {
+        font-size: 11px;
+        padding: 8px 12px;
+      }
+      
+      .instructions {
+        font-size: 11px;
+        padding: 8px 14px;
+      }
+    }
+  </style>
 
-    <script src="./Utils/trackball-rotator.js"></script>
-    <script src="./Utils/m4.js"></script>
-    <script src="./StereoCamera.js"></script>
-    <script src="./Texture.js"></script>
-    <script src="./shader.gpu"></script>
-    <script src="./Model.js"></script>
-    <script src="./main.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.3.0/dist/aframe-master.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  
+  <script>
+    AFRAME.registerComponent('astroidal-torus', {
+      schema: {
+        a: {type: 'number', default: 0.3},
+        r: {type: 'number', default: 1.0},
+        segmentsCount: {type: 'number', default: 30},
+        theta: {type: 'number', default: 0},
+        color: {type: 'color', default: '#ff5a5a'},
+        wireframe: {type: 'boolean', default: false}
+      },
+      
+      init: function() {
+        this.createTorus();
+      },
+      
+      update: function(oldData) {
+        if (this.mesh && (
+            oldData.a !== this.data.a ||
+            oldData.r !== this.data.r ||
+            oldData.segmentsCount !== this.data.segmentsCount ||
+            oldData.theta !== this.data.theta
+        )) {
+          this.el.removeObject3D('mesh');
+          this.createTorus();
+        } else if (this.mesh) {
+          if (oldData.color !== this.data.color) {
+            this.mesh.material.color.set(this.data.color);
+          }
+          if (oldData.wireframe !== this.data.wireframe) {
+            this.mesh.material.wireframe = this.data.wireframe;
+          }
+        }
+      },
+      
+      createTorus: function() {
+        const data = this.data;
+        const geometry = new THREE.BufferGeometry();
+        
+        let vertices = [];
+        let indices = [];
+        
+        let uSegments = data.segmentsCount;
+        let vSegments = data.segmentsCount;
+        
+        for (let i = 0; i <= uSegments; i++) {
+          let u = -Math.PI + (2 * Math.PI * i) / uSegments;
+          if (i === uSegments) u = -Math.PI;
+
+          let x_u = data.a * Math.pow(Math.cos(u), 3);
+          let z_u = data.a * Math.pow(Math.sin(u), 3);
+
+          for (let j = 0; j <= vSegments; j++) {
+            let v = (2 * Math.PI * j) / vSegments;
+            if (j === vSegments) v = 0;
+
+            let X = (data.r + x_u * Math.cos(data.theta) - z_u * Math.sin(data.theta)) * Math.cos(v);
+            let Y = (data.r + x_u * Math.cos(data.theta) - z_u * Math.sin(data.theta)) * Math.sin(v);
+            let Z = x_u * Math.sin(data.theta) + z_u * Math.cos(data.theta);
+
+            vertices.push(X, Y, Z);
+          }
+        }
+
+        for (let i = 0; i < uSegments; i++) {
+          for (let j = 0; j < vSegments; j++) {
+            let current = i * (vSegments + 1) + j;
+            let next = (i + 1) * (vSegments + 1) + j;
+
+            indices.push(current, next, current + 1);
+            indices.push(current + 1, next, next + 1);
+          }
+        }
+
+        for (let j = 0; j < vSegments; j++) {
+          let current = (uSegments - 1) * (vSegments + 1) + j;
+          let next = j;
+
+          indices.push(current, next, current + 1);
+          indices.push(current + 1, next, next + 1);
+        }
+
+        for (let i = 0; i < uSegments; i++) {
+          let current = i * (vSegments + 1) + (vSegments - 1);
+          let next = (i + 1) * (vSegments + 1) + (vSegments - 1);
+
+          indices.push(current, next, i * (vSegments + 1));
+          indices.push(i * (vSegments + 1), next, (i + 1) * (vSegments + 1));
+        }
+
+        let last = (uSegments - 1) * (vSegments + 1) + (vSegments - 1);
+        let first = 0;
+
+        indices.push(last, vSegments - 1, uSegments * (vSegments + 1) - 1);
+        indices.push(uSegments * (vSegments + 1) - 1, vSegments - 1, first);
+        
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        
+        const material = new THREE.MeshStandardMaterial({
+          color: data.color,
+          side: THREE.DoubleSide,
+          wireframe: data.wireframe
+        });
+        
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.el.setObject3D('mesh', this.mesh);
+      },
+      
+      remove: function() {
+        if (this.mesh) {
+          this.el.removeObject3D('mesh');
+        }
+      }
+    });
+
+    AFRAME.registerComponent('multi-axis-rotation', {
+      schema: {
+        enabled: {type: 'boolean', default: true},
+        speed: {type: 'number', default: 0.3},
+        mode: {type: 'string', default: 'y'}
+      },
+      
+      init: function() {
+        this.rotationValues = {
+          x: 0,
+          y: 0,
+          z: 0
+        };
+      },
+      
+      tick: function(time, deltaTime) {
+        if (!this.data.enabled) return;
+        
+        const dt = deltaTime / 1000;
+        const speed = this.data.speed;
+        const mode = this.data.mode;
+        
+        if (mode.includes('x')) {
+          this.rotationValues.x += dt * speed;
+        }
+        
+        if (mode.includes('y')) {
+          this.rotationValues.y += dt * speed;
+        }
+        
+        if (mode.includes('z')) {
+          this.rotationValues.z += dt * speed;
+        }
+        
+        this.el.object3D.rotation.x = this.rotationValues.x;
+        this.el.object3D.rotation.y = this.rotationValues.y;
+        this.el.object3D.rotation.z = this.rotationValues.z;
+      }
+    });
+  </script>
 </head>
 
-<body onload="init()">
-    <h1 class="page-title">Astroidal Torus</h1>
+<body>
+  <div class="loading" id="loading">Initializing AR Camera...</div>
+  <div class="title">Astroidal Torus AR</div>
+  <div class="info-panel" id="info">Looking for marker...</div>
+  <div class="instructions" id="instructions">Point your camera at the marker to see the 3D model</div>
 
-    <div class="main-container">
-        <div class="controls-panel">
-            <h2 class="panel-title">Stereo Camera Controls</h2>
+  <a-scene embedded vr-mode-ui="enabled: false;"
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+    <a-marker type="pattern" preset="custom" url="./marker.patt" id="marker">
+      <a-entity id="astroidal-torus" 
+                position="0 0.5 0" 
+                rotation="-90 0 0" 
+                scale="0.35 0.35 0.35"
+                astroidal-torus="a: 0.3; r: 1.0; segmentsCount: 30; theta: 0; color: #ff6b6b; wireframe: false"
+                multi-axis-rotation="enabled: true; speed: 0.3; mode: y">
+      </a-entity>
+    </a-marker>
 
-            <div class="control-group">
-                <div class="control-wrapper">
-                    <div class="slider-header">
-                        <label for="eyeSeparation">Eye Separation</label>
-                        <span class="value-display" id="eyeSepValue">0.7</span>
-                    </div>
-                    <input type="range" id="eyeSeparation" min="0.1" max="2.0" step="0.1" value="0.7"
-                        oninput="updateEyeSepValue(this.value); updateParameters();" />
-                    <div class="control-description">
-                        Controls the distance between stereoscopic viewpoints
-                    </div>
-                </div>
-            </div>
+    <a-entity camera></a-entity>
+  </a-scene>
 
-            <div class="control-group">
-                <div class="control-wrapper">
-                    <div class="slider-header">
-                        <label for="fov">Field of View</label>
-                        <span class="value-display" id="fovValue">0.4</span>
-                    </div>
-                    <input type="range" id="fov" min="0.1" max="1.0" step="0.05" value="0.4"
-                        oninput="updateFovValue(this.value); updateParameters();" />
-                    <div class="control-description">
-                        Adjusts the camera's field of view in radians
-                    </div>
-                </div>
-            </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const marker = document.querySelector('#marker');
+      const torusEntity = document.getElementById('astroidal-torus');
+      const infoPanel = document.getElementById('info');
+      const loadingPanel = document.getElementById('loading');
+      const instructionsPanel = document.getElementById('instructions');
+      
+      setTimeout(() => {
+        loadingPanel.style.display = 'none';
+      }, 3000);
+      
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const isTablet = /iPad|tablet|Tablet/i.test(navigator.userAgent) || 
+                       (isMobile && Math.min(window.screen.width, window.screen.height) > 480);
+      
+      console.log("Device:", {
+        isMobile: isMobile,
+        isTablet: isTablet,
+        userAgent: navigator.userAgent,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height
+      });
 
-            <div class="control-group">
-                <div class="control-wrapper">
-                    <div class="slider-header">
-                        <label for="nearClipping">Near Clipping Distance</label>
-                        <span class="value-display" id="nearValue">8.0</span>
-                    </div>
-                    <input type="range" id="nearClipping" min="1.0" max="10.0" step="0.5" value="8.0"
-                        oninput="updateNearValue(this.value); updateParameters();" />
-                    <div class="control-description">
-                        Sets the minimum rendering distance from camera
-                    </div>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-wrapper">
-                    <div class="slider-header">
-                        <label for="convergence">Convergence Distance</label>
-                        <span class="value-display" id="convValue">14.0</span>
-                    </div>
-                    <input type="range" id="convergence" min="10.0" max="20.0" step="0.5" value="14.0"
-                        oninput="updateConvValue(this.value); updateParameters();" />
-                    <div class="control-description">
-                        Controls the distance at which the stereo views converge
-                    </div>
-                </div>
-            </div>
-            
-            <h3 class="panel-title">Phone Connection</h3>
-
-            <div class="control-group">
-                <div class="control-wrapper">
-                    <label for="wsUrl">WebSocket URL:</label>
-                    <input type="text" id="wsUrl" class="text-input" value="ws://192.168.0.199:8080/sensor/connect?type=android.sensor.game_rotation_vector">
-                    <div class="button-row">
-                        <button id="connectBtn" class="action-button">Connect</button>
-                        <button id="disconnectBtn" class="action-button" disabled>Disconnect</button>
-                    </div>
-                    <div class="connection-status">
-                        Status: <span id="connectionStatus">Disconnected</span>
-                    </div>
-                </div>
-            </div>
-            <div class="control-group">
-                <h4 class="panel-subtitle">Sensor Values (Quaternion)</h4>
-                <div class="sensor-value-grid">
-                    <div class="sensor-value-item">
-                        <span class="sensor-label">X:</span>
-                        <span id="sensorValueX" class="sensor-value">0.00</span>
-                    </div>
-                    <div class="sensor-value-item">
-                        <span class="sensor-label">Y:</span>
-                        <span id="sensorValueY" class="sensor-value">0.00</span>
-                    </div>
-                    <div class="sensor-value-item">
-                        <span class="sensor-label">Z:</span>
-                        <span id="sensorValueZ" class="sensor-value">0.00</span>
-                    </div>
-                    <div class="sensor-value-item">
-                        <span class="sensor-label">W:</span>
-                        <span id="sensorValueW" class="sensor-value">0.00</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="canvas-container">
-            <canvas width="800" height="600" id="webglcanvas"></canvas>
-        </div>
-    </div>
-
-    <script>
-        function updateEyeSepValue(value) {
-            document.getElementById("eyeSepValue").textContent = value;
-        }
-
-        function updateFovValue(value) {
-            document.getElementById("fovValue").textContent = value;
-        }
-
-        function updateNearValue(value) {
-            document.getElementById("nearValue").textContent = value;
-        }
-
-        function updateConvValue(value) {
-            document.getElementById("convValue").textContent = value;
-        }
-
-        // Initial resize and add listener
-        window.addEventListener('load', resizeCanvas);
-        window.addEventListener('resize', resizeCanvas);
-    </script>
+      if (isMobile && !isTablet) {
+        torusEntity.setAttribute('scale', '0.25 0.25 0.25');
+        infoPanel.textContent = 'Looking for marker... (Mobile)';
+        console.log("Applied mobile settings");
+      } else if (isTablet) {
+        torusEntity.setAttribute('scale', '0.3 0.3 0.3');
+        infoPanel.textContent = 'Looking for marker... (Tablet)';
+        console.log("Applied tablet settings");
+      } else {
+        torusEntity.setAttribute('scale', '0.35 0.35 0.35');
+        infoPanel.textContent = 'Looking for marker... (Desktop)';
+        console.log("Applied desktop settings");
+      }
+      
+      marker.addEventListener('markerFound', function() {
+        infoPanel.textContent = '✓ Marker detected!';
+        infoPanel.className = 'info-panel marker-found';
+        instructionsPanel.style.display = 'none';
+        console.log('Marker found!');
+      });
+      
+      marker.addEventListener('markerLost', function() {
+        infoPanel.textContent = '✗ Marker lost';
+        infoPanel.className = 'info-panel marker-lost';
+        instructionsPanel.style.display = 'block';
+        console.log('Marker lost!');
+      });
+    });
+  </script>
 </body>
-
 </html>
